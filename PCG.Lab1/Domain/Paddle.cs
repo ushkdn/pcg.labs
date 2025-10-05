@@ -21,6 +21,8 @@ public class Paddle(int x, int y, int width, int height, int speed = 6)
         Position = new Position(Position.X, Math.Min(limitBottom - Size.Height, Position.Y + speed));
     }
 
+    public void ResetX(int x) => Position = new Position(x, Position.Y);
+
     // Центрирование ракетки по Y
     public void ResetY(int y) =>
         Position = new Position(Position.X, y);

@@ -26,7 +26,7 @@ public class GameService : IGameService
         if (IsIntersect(ball, state.LeftPaddle))
         {
             // Ускорение мяча после удара
-            float newVx = Math.Abs(ball.SpeedX) + 0.2f;
+            float newVx = Math.Abs(ball.SpeedX) + 0.8f;
             // Вычисление вертикальной скорости после удара
             float newVy = GetReboundVy(ball, state.LeftPaddle);
 
@@ -37,7 +37,7 @@ public class GameService : IGameService
         // Столкновение с правой ракеткой
         if (IsIntersect(ball, state.RightPaddle))
         {
-            float newVx = -Math.Abs(ball.SpeedX) - 0.2f;
+            float newVx = -Math.Abs(ball.SpeedX) - 0.8f;
             float newVy = GetReboundVy(ball, state.RightPaddle);
             ball.BounceX(newVx, newVy);
         }
@@ -46,27 +46,30 @@ public class GameService : IGameService
         if (ball.Left < 0)
         {
             state.AddRightScore();
-            Restart(state, directionToRight: false);
+            Restart(state, canvasWidth, canvasHeight, false);
         }
         else if (ball.Right > canvasWidth)
         {
             state.AddLeftScore();
-            Restart(state, directionToRight: true);
+            Restart(state, canvasWidth, canvasHeight, true);
         }
     }
 
-    public void Restart(GameState state, bool? directionToRight = null)
+    public void Restart(GameState state, int canvasWidth, int canvasHeight,bool? directionToRight = null)
     {
         // Определяем направление нового удара
         bool dir = directionToRight ?? (rnd.Next(0, 2) == 0);
 
         // Сброс мяча в центр
         // v_x = ±5, v_y случайно от -2 до 2
-        state.Ball.Reset(400 - 7, 240 - 7, dir ? 5f : -5f, (float)(rnd.NextDouble() * 4 - 2));
+        state.Ball.Reset(canvasWidth / 2 - state.Ball.Size.Width / 2,
+                         canvasHeight / 2 - state.Ball.Size.Height / 2,
+                         dir ? 5f : -5f,
+                         (float)(rnd.NextDouble() * 4 - 2));
 
-        // Центрируем ракетки
-        state.LeftPaddle.ResetY(200);
-        state.RightPaddle.ResetY(200);
+        // Центрируем ракетки по вертикали
+        state.LeftPaddle.ResetY(canvasHeight / 2 - state.LeftPaddle.Size.Height / 2);
+        state.RightPaddle.ResetY(canvasHeight / 2 - state.RightPaddle.Size.Height / 2);
     }
 
     private static bool IsIntersect(Ball ball, Paddle paddle) =>

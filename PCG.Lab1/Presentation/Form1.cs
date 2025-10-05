@@ -22,16 +22,19 @@ public partial class Form1 : Form
     {
         Text = Title;
         ClientSize = new Size(CanvasWidth, CanvasHeight);
-        FormBorderStyle = FormBorderStyle.FixedSingle;
-        MaximizeBox = false;
+        FormBorderStyle = FormBorderStyle.Sizable;
+        MaximizeBox = true;
         DoubleBuffered = true;
 
-        var left = new Paddle(20, (CanvasHeight - 80) / 2, 12, 80);
-        var right = new Paddle(CanvasWidth - 32, (CanvasHeight - 80) / 2, 12, 80);
-        var ball = new Ball(CanvasWidth / 2, CanvasHeight / 2, 14, 5, 3);
+        var left = new Paddle(20, (ClientSize.Height - 80) / 2, 12, 80);
+        var right = new Paddle(ClientSize.Width - 32, (ClientSize.Height - 80) / 2, 12, 80);
+        var ball = new Ball(ClientSize.Width / 2, ClientSize.Height / 2, 14, 5, 3);
 
         gameState = new GameState(left, right, ball);
         gameService = new GameService();
+
+        // Здесь подписка на событие ресайза
+        this.ClientSizeChanged += OnResize;
 
         timer = new Timer { Interval = 16 };
         timer.Tick += (_, _) =>
@@ -39,7 +42,7 @@ public partial class Form1 : Form
             if (!gameState.IsPaused)
             {
                 HandleInput();
-                gameService.Update(gameState, CanvasWidth, CanvasHeight);
+                gameService.Update(gameState, ClientSize.Width, ClientSize.Height);
             }
             Invalidate();
         };
@@ -50,16 +53,24 @@ public partial class Form1 : Form
         Paint += OnPaint;
     }
 
+    // Метод обработчика
+    private void OnResize(object sender, EventArgs e)
+    {
+        // Держим правую ракетку справа
+        gameState.RightPaddle.ResetX(ClientSize.Width - gameState.RightPaddle.Size.Width);
+    }
+
+
     private void HandleInput()
     {
         if (leftUp)
             gameState.LeftPaddle.MoveUp();
         if (leftDown)
-            gameState.LeftPaddle.MoveDown(CanvasHeight);
+            gameState.LeftPaddle.MoveDown(ClientSize.Height);
         if (rightUp)
             gameState.RightPaddle.MoveUp();
         if (rightDown)
-            gameState.RightPaddle.MoveDown(CanvasHeight);
+            gameState.RightPaddle.MoveDown(ClientSize.Height);
     }
 
     private void OnKeyDown(object sender, KeyEventArgs e)
@@ -76,7 +87,8 @@ public partial class Form1 : Form
         if (e.KeyCode == Keys.P)
             gameState.TogglePause();
         if (e.KeyCode == Keys.R)
-            gameService.Restart(gameState);
+            gameService.Restart(gameState, ClientSize.Width, ClientSize.Height);
+
         if (e.KeyCode == Keys.Escape)
             Close();
     }
@@ -101,7 +113,7 @@ public partial class Form1 : Form
         using Brush b = new SolidBrush(Color.LightGray);
 
         string hints = "W/S — левая, ↑/↓ — правая, P — пауза, R — рестарт, Esc — выход";
-        g.DrawString(hints, f, b, 10, CanvasHeight - 22);
+        g.DrawString(hints, f, b, 10, ClientSize.Height - 22);
 
     }
 
@@ -111,9 +123,9 @@ public partial class Form1 : Form
 
         using Brush b = new SolidBrush(Color.Gray);
 
-        for (int y = 0; y < CanvasHeight; y += 32)
+        for (int y = 0; y < ClientSize.Height; y += 32)
         {
-            g.FillRectangle(b, (CanvasWidth - 4) / 2, y, 4, 16);
+            g.FillRectangle(b, (ClientSize.Width - 4) / 2, y, 4, 16);
         }
     }
 
@@ -127,7 +139,7 @@ public partial class Form1 : Form
         string score = $"{gameState.LeftScore} : {gameState.RightScore}";
         var size = g.MeasureString(score, f);
 
-        g.DrawString(score, f, b, (CanvasWidth - size.Width) / 2, 10);
+        g.DrawString(score, f, b, (ClientSize.Width - size.Width) / 2, 10);
 
     }
 
@@ -160,7 +172,8 @@ public partial class Form1 : Form
             var text = "PAUSED";
             var s = g.MeasureString(text, f);
 
-            g.DrawString(text, f, Brushes.White, (CanvasWidth - s.Width) / 2, (CanvasHeight - s.Height) / 2);
+            g.DrawString(text, f, Brushes.White, (ClientSize.Width - s.Width) / 2, (ClientSize.Height - s.Height) / 2);
+
         }
     }
 }
