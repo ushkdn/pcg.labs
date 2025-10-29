@@ -19,7 +19,7 @@ public static class TransformationService
             result.Palette.Add(new ColorVertex(vertex.Color, vertex.Position));
         }
 
-        // Применяем преобразования к пикселям
+        // Применяем преобразования к пикселям с использованием ассемблерных операций
         foreach (var pixel in container.Pixels)
         {
             var transformedPixel = ApplySinglePixelTransformations(pixel, parameters);
@@ -34,31 +34,43 @@ public static class TransformationService
         float x = pixel.X;
         float y = pixel.Y;
 
-        // Масштабирование
-        x *= parameters.Scale;
-        y *= parameters.Scale;
+        // Масштабирование через ассемблерные операции
+        x = AssemblyOperationsService.MultiplyFloat(x, parameters.Scale);
+        y = AssemblyOperationsService.MultiplyFloat(y, parameters.Scale);
 
-        // Поворот
-        if (parameters.Rotation != 0)
+        // Поворот через ассемблерные операции
+        if (AssemblyOperationsService.CompareGreaterThan((int)parameters.Rotation, 0) ||
+            AssemblyOperationsService.CompareLessThan((int)parameters.Rotation, 0))
         {
-            double angle = parameters.Rotation * Math.PI / 180.0;
+            double angle = AssemblyOperationsService.MultiplyFloat(parameters.Rotation, (float)(Math.PI / 180.0));
             double cos = Math.Cos(angle);
             double sin = Math.Sin(angle);
-            float newX = (float)(x * cos - y * sin);
-            float newY = (float)(x * sin + y * cos);
+
+            float newX = (float)(
+                AssemblyOperationsService.SubtractFloat(
+                    AssemblyOperationsService.MultiplyFloat(x, (float)cos),
+                    AssemblyOperationsService.MultiplyFloat(y, (float)sin)
+                )
+            );
+            float newY = (float)(
+                AssemblyOperationsService.AddFloat(
+                    AssemblyOperationsService.MultiplyFloat(x, (float)sin),
+                    AssemblyOperationsService.MultiplyFloat(y, (float)cos)
+                )
+            );
             x = newX;
             y = newY;
         }
 
-        // Сдвиг
-        x += parameters.OffsetX;
-        y += parameters.OffsetY;
+        // Сдвиг через ассемблерные операции
+        x = AssemblyOperationsService.AddFloat(x, parameters.OffsetX);
+        y = AssemblyOperationsService.AddFloat(y, parameters.OffsetY);
 
-        // Отражение
+        // Отражение через ассемблерные операции
         if (parameters.MirrorX)
-            x = -x;
+            x = AssemblyOperationsService.MultiplyFloat(x, -1f);
         if (parameters.MirrorY)
-            y = -y;
+            y = AssemblyOperationsService.MultiplyFloat(y, -1f);
 
         return new Pixel(x, y);
     }
@@ -86,42 +98,89 @@ public static class TransformationService
         int g = color.G;
         int b = color.B;
 
-        // Яркость
-        r = Clamp(r + parameters.Brightness);
-        g = Clamp(g + parameters.Brightness);
-        b = Clamp(b + parameters.Brightness);
+        // Яркость через ассемблерные операции
+        r = AssemblyOperationsService.AddInt(r, parameters.Brightness);
+        g = AssemblyOperationsService.AddInt(g, parameters.Brightness);
+        b = AssemblyOperationsService.AddInt(b, parameters.Brightness);
 
-        // Контрастность
-        r = Clamp((int)((r - 128) * parameters.Contrast + 128));
-        g = Clamp((int)((g - 128) * parameters.Contrast + 128));
-        b = Clamp((int)((b - 128) * parameters.Contrast + 128));
+        // Контрастность через ассемблерные операции
+        r = AssemblyOperationsService.Clamp(
+            AssemblyOperationsService.AddInt(
+                128,
+                AssemblyOperationsService.MultiplyInt(
+                    AssemblyOperationsService.SubtractInt(r, 128),
+                    (int)parameters.Contrast
+                )
+            ), 0, 255
+        );
+        g = AssemblyOperationsService.Clamp(
+            AssemblyOperationsService.AddInt(
+                128,
+                AssemblyOperationsService.MultiplyInt(
+                    AssemblyOperationsService.SubtractInt(g, 128),
+                    (int)parameters.Contrast
+                )
+            ), 0, 255
+        );
+        b = AssemblyOperationsService.Clamp(
+            AssemblyOperationsService.AddInt(
+                128,
+                AssemblyOperationsService.MultiplyInt(
+                    AssemblyOperationsService.SubtractInt(b, 128),
+                    (int)parameters.Contrast
+                )
+            ), 0, 255
+        );
 
-        // Насыщенность
-        float gray = (r + g + b) / 3.0f;
-        r = Clamp((int)(gray + (r - gray) * parameters.Saturation));
-        g = Clamp((int)(gray + (g - gray) * parameters.Saturation));
-        b = Clamp((int)(gray + (b - gray) * parameters.Saturation));
+        // Насыщенность через ассемблерные операции
+        float gray = AssemblyOperationsService.DivideFloat(
+            AssemblyOperationsService.AddInt(AssemblyOperationsService.AddInt(r, g), b),
+            3.0f
+        );
+        r = AssemblyOperationsService.Clamp(
+            (int)AssemblyOperationsService.AddFloat(
+                gray,
+                AssemblyOperationsService.MultiplyFloat(
+                    AssemblyOperationsService.SubtractFloat(r, gray),
+                    parameters.Saturation
+                )
+            ), 0, 255
+        );
+        g = AssemblyOperationsService.Clamp(
+            (int)AssemblyOperationsService.AddFloat(
+                gray,
+                AssemblyOperationsService.MultiplyFloat(
+                    AssemblyOperationsService.SubtractFloat(g, gray),
+                    parameters.Saturation
+                )
+            ), 0, 255
+        );
+        b = AssemblyOperationsService.Clamp(
+            (int)AssemblyOperationsService.AddFloat(
+                gray,
+                AssemblyOperationsService.MultiplyFloat(
+                    AssemblyOperationsService.SubtractFloat(b, gray),
+                    parameters.Saturation
+                )
+            ), 0, 255
+        );
 
-        // Оттенок (упрощенная реализация)
-        if (parameters.Hue != 0)
+        // Оттенок через ассемблерные операции
+        if (AssemblyOperationsService.CompareGreaterThan((int)parameters.Hue, 0) ||
+            AssemblyOperationsService.CompareLessThan((int)parameters.Hue, 0))
         {
-            // Преобразование RGB в HSL и обратно было бы более корректным
-            // Здесь упрощенный вариант через вращение цветового круга
-            int max = Math.Max(Math.Max(r, g), b);
-            int min = Math.Min(Math.Min(r, g), b);
+            int max = AssemblyOperationsService.Max(AssemblyOperationsService.Max(r, g), b);
+            int min = AssemblyOperationsService.Min(AssemblyOperationsService.Min(r, g), b);
 
-            if (max != min)
+            if (AssemblyOperationsService.CompareGreaterThan(max, min))
             {
-                float hueShift = parameters.Hue * 360f / 100f;
-                // Упрощенное преобразование - на практике нужно полное RGB->HSL->RGB
-                r = Clamp(r + (int)(hueShift * 0.3));
-                g = Clamp(g + (int)(hueShift * 0.3));
-                b = Clamp(b + (int)(hueShift * 0.3));
+                float hueShift = AssemblyOperationsService.MultiplyFloat(parameters.Hue, 0.3f);
+                r = AssemblyOperationsService.Clamp(AssemblyOperationsService.AddInt(r, (int)hueShift), 0, 255);
+                g = AssemblyOperationsService.Clamp(AssemblyOperationsService.AddInt(g, (int)hueShift), 0, 255);
+                b = AssemblyOperationsService.Clamp(AssemblyOperationsService.SubtractInt(b, (int)hueShift), 0, 255);
             }
         }
 
         return Color.FromArgb(r, g, b);
     }
-
-    private static int Clamp(int value) => Math.Max(0, Math.Min(255, value));
 }

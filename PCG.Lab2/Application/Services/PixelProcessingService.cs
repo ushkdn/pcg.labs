@@ -1,4 +1,5 @@
-﻿using Domain.Entities;
+﻿// Application/Services/PixelProcessingService.cs
+using Domain.Entities;
 using System.Drawing;
 
 namespace Application.Services;
@@ -11,18 +12,29 @@ public static class PixelProcessingService
         if (container == null || container.Palette.Count == 0)
             return Color.Black;
 
+        // Используем ассемблерные операции для математических вычислений
         double angle = Math.Atan2(pixel.Y, pixel.X); // -pi..pi
-        if (angle < 0)
-            angle += 2 * Math.PI; // 0..2pi
-        double radius = Math.Sqrt(pixel.X * pixel.X + pixel.Y * pixel.Y); // 0..
-        radius = Math.Min(1.0, radius);
+
+        // Приведение угла к диапазону [0, 2pi] с использованием ассемблерных операций
+        if (AssemblyOperationsService.CompareLessThan((int)angle, 0))
+        {
+            angle = AssemblyOperationsService.AddFloat((float)angle, (float)(2 * Math.PI));
+        }
+
+        // Вычисление радиуса с использованием ассемблерных операций
+        double radiusSquared = AssemblyOperationsService.AddFloat(
+            AssemblyOperationsService.MultiplyFloat(pixel.X, pixel.X),
+            AssemblyOperationsService.MultiplyFloat(pixel.Y, pixel.Y)
+        );
+        double radius = Math.Sqrt(radiusSquared); // 0..
+        radius = AssemblyOperationsService.CompareLessThan((int)radius, 1) ? radius : 1.0;
 
         var verts = new List<(Color color, double angle)>();
         foreach (var v in container.Palette)
         {
             double a = Math.Atan2(v.Position.Y, v.Position.X);
-            if (a < 0)
-                a += 2 * Math.PI;
+            if (AssemblyOperationsService.CompareLessThan((int)a, 0))
+                a = AssemblyOperationsService.AddFloat((float)a, (float)(2 * Math.PI));
             verts.Add((v.Color, a));
         }
         verts.Sort((a, b) => a.angle.CompareTo(b.angle));
@@ -31,10 +43,17 @@ public static class PixelProcessingService
         if (verts.Count == 1)
         {
             var c = verts[0].color;
-            int rr = (int)(c.R * radius);
-            int gg = (int)(c.G * radius);
-            int bb = (int)(c.B * radius);
-            return Color.FromArgb(Clamp(rr), Clamp(gg), Clamp(bb));
+
+            // Используем ассемблерные операции для вычисления цветов
+            int rr = AssemblyOperationsService.MultiplyInt(c.R, (int)radius);
+            int gg = AssemblyOperationsService.MultiplyInt(c.G, (int)radius);
+            int bb = AssemblyOperationsService.MultiplyInt(c.B, (int)radius);
+
+            return Color.FromArgb(
+                AssemblyOperationsService.Clamp(rr, 0, 255),
+                AssemblyOperationsService.Clamp(gg, 0, 255),
+                AssemblyOperationsService.Clamp(bb, 0, 255)
+            );
         }
         if (verts.Count == 0)
             return Color.Black;
@@ -43,11 +62,12 @@ public static class PixelProcessingService
         int sector = 0;
         for (int i = 0; i < verts.Count; i++)
         {
-            int next = (i + 1) % verts.Count;
+            int next = AssemblyOperationsService.AddInt(i, 1) % verts.Count;
             double a1 = verts[i].angle;
             double a2 = verts[next].angle;
             bool inside;
-            if (a2 < a1)
+
+            if (AssemblyOperationsService.CompareLessThan((int)a2, (int)a1))
                 inside = (angle >= a1 && angle <= 2 * Math.PI) || (angle >= 0 && angle <= a2);
             else
                 inside = angle >= a1 && angle <= a2;
@@ -60,28 +80,51 @@ public static class PixelProcessingService
         }
 
         var vA = verts[sector];
-        var vB = verts[(sector + 1) % verts.Count];
+        var vB = verts[AssemblyOperationsService.AddInt(sector, 1) % verts.Count];
 
         double aA = vA.angle;
         double aB = vB.angle;
+
+        // Вычисление span и rel с использованием ассемблерных операций
         double span = aB - aA;
-        if (span <= 0)
-            span += 2 * Math.PI;
+        if (AssemblyOperationsService.CompareLessThan((int)span, 0))
+            span = AssemblyOperationsService.AddFloat((float)span, (float)(2 * Math.PI));
+
         double rel = angle - aA;
-        if (rel < 0)
-            rel += 2 * Math.PI;
-        double t = span == 0 ? 0 : rel / span;
+        if (AssemblyOperationsService.CompareLessThan((int)rel, 0))
+            rel = AssemblyOperationsService.AddFloat((float)rel, (float)(2 * Math.PI));
 
-        int r = (int)(vA.color.R * (1 - t) + vB.color.R * t);
-        int g = (int)(vA.color.G * (1 - t) + vB.color.G * t);
-        int b = (int)(vA.color.B * (1 - t) + vB.color.B * t);
+        double t = span == 0 ? 0 : AssemblyOperationsService.DivideFloat((float)rel, (float)span);
 
-        int finalR = (int)(r * radius);
-        int finalG = (int)(g * radius);
-        int finalB = (int)(b * radius);
+        // Интерполяция цветов с использованием ассемблерных операций
+        int r = (int)(
+            AssemblyOperationsService.AddFloat(
+                AssemblyOperationsService.MultiplyFloat(vA.color.R, (float)(1 - t)),
+                AssemblyOperationsService.MultiplyFloat(vB.color.R, (float)t)
+            )
+        );
+        int g = (int)(
+            AssemblyOperationsService.AddFloat(
+                AssemblyOperationsService.MultiplyFloat(vA.color.G, (float)(1 - t)),
+                AssemblyOperationsService.MultiplyFloat(vB.color.G, (float)t)
+            )
+        );
+        int b = (int)(
+            AssemblyOperationsService.AddFloat(
+                AssemblyOperationsService.MultiplyFloat(vA.color.B, (float)(1 - t)),
+                AssemblyOperationsService.MultiplyFloat(vB.color.B, (float)t)
+            )
+        );
 
-        return Color.FromArgb(Clamp(finalR), Clamp(finalG), Clamp(finalB));
+        // Умножение на радиус с использованием ассемблерных операций
+        int finalR = AssemblyOperationsService.MultiplyInt(r, (int)radius);
+        int finalG = AssemblyOperationsService.MultiplyInt(g, (int)radius);
+        int finalB = AssemblyOperationsService.MultiplyInt(b, (int)radius);
+
+        return Color.FromArgb(
+            AssemblyOperationsService.Clamp(finalR, 0, 255),
+            AssemblyOperationsService.Clamp(finalG, 0, 255),
+            AssemblyOperationsService.Clamp(finalB, 0, 255)
+        );
     }
-
-    private static int Clamp(int v) => Math.Max(0, Math.Min(255, v));
 }
