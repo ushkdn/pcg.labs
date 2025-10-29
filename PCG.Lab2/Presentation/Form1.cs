@@ -17,6 +17,13 @@ public partial class Form1 : Form
     private readonly Button btnLoad;
     private readonly Label lblInfo;
     private readonly Random rnd = new Random();
+    private readonly Button btnGeneratePattern;
+    private PatternType currentPatternType = PatternType.Tiles;
+    private Color primaryColor = Color.Red;
+    private Color secondaryColor = Color.Blue;
+    private int elementSize = 20;
+    private int patternWidth = 400;
+    private int patternHeight = 400;
 
     private readonly float radius = 180f;
 
@@ -49,6 +56,14 @@ public partial class Form1 : Form
             BorderStyle = BorderStyle.FixedSingle,
             BackColor = Color.White
         };
+        btnGeneratePattern = new Button
+        {
+            Text = "Сгенерировать узор",
+            Location = new Point(620, 260),
+            Width = 140
+        };
+        Controls.Add(btnGeneratePattern);
+        btnGeneratePattern.Click += BtnGeneratePattern_Click;
 
         Controls.AddRange(new Control[] { canvas, btnNewPalette, btnEditPalette, btnClearPixels, btnSave, btnLoad, lblInfo });
 
@@ -64,6 +79,155 @@ public partial class Form1 : Form
         CreateDefaultPalette();
     }
 
+    private void BtnGeneratePattern_Click(object? sender, EventArgs e)
+    {
+        using var patternDialog = new Form
+        {
+            Text = "Генератор узоров",
+            Size = new Size(500, 400),
+            StartPosition = FormStartPosition.CenterParent
+        };
+
+        var layout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 2,
+            RowCount = 7
+        };
+
+        // Выбор типа узора
+        layout.Controls.Add(new Label { Text = "Тип узора:", AutoSize = true });
+        var cmbPatternType = new ComboBox
+        {
+            Dock = DockStyle.Fill,
+            DropDownStyle = ComboBoxStyle.DropDownList
+        };
+        cmbPatternType.Items.AddRange(Enum.GetNames(typeof(PatternType)));
+        cmbPatternType.SelectedItem = currentPatternType.ToString();
+        layout.Controls.Add(cmbPatternType);
+
+        // Основной цвет
+        layout.Controls.Add(new Label { Text = "Основной цвет:", AutoSize = true });
+        var btnPrimaryColor = new Button
+        {
+            Text = "Выбрать",
+            BackColor = primaryColor,
+            ForeColor = Invert(primaryColor)
+        };
+        btnPrimaryColor.Click += (s, e) =>
+        {
+            using var cd = new ColorDialog { Color = primaryColor };
+            if (cd.ShowDialog() == DialogResult.OK)
+            {
+                primaryColor = cd.Color;
+                btnPrimaryColor.BackColor = primaryColor;
+                btnPrimaryColor.ForeColor = Invert(primaryColor);
+            }
+        };
+        layout.Controls.Add(btnPrimaryColor);
+
+        // Вторичный цвет
+        layout.Controls.Add(new Label { Text = "Вторичный цвет:", AutoSize = true });
+        var btnSecondaryColor = new Button
+        {
+            Text = "Выбрать",
+            BackColor = secondaryColor,
+            ForeColor = Invert(secondaryColor)
+        };
+        btnSecondaryColor.Click += (s, e) =>
+        {
+            using var cd = new ColorDialog { Color = secondaryColor };
+            if (cd.ShowDialog() == DialogResult.OK)
+            {
+                secondaryColor = cd.Color;
+                btnSecondaryColor.BackColor = secondaryColor;
+                btnSecondaryColor.ForeColor = Invert(secondaryColor);
+            }
+        };
+        layout.Controls.Add(btnSecondaryColor);
+
+        // Размер элемента
+        layout.Controls.Add(new Label { Text = "Размер элемента:", AutoSize = true });
+        var numElementSize = new NumericUpDown
+        {
+            Minimum = 5,
+            Maximum = 100,
+            Value = elementSize
+        };
+        layout.Controls.Add(numElementSize);
+
+        // Ширина изображения
+        layout.Controls.Add(new Label { Text = "Ширина:", AutoSize = true });
+        var numWidth = new NumericUpDown
+        {
+            Minimum = 100,
+            Maximum = 1000,
+            Value = patternWidth
+        };
+        layout.Controls.Add(numWidth);
+
+        // Высота изображения
+        layout.Controls.Add(new Label { Text = "Высота:", AutoSize = true });
+        var numHeight = new NumericUpDown
+        {
+            Minimum = 100,
+            Maximum = 1000,
+            Value = patternHeight
+        };
+        layout.Controls.Add(numHeight);
+
+        // Кнопки генерации и отмены
+        var btnGenerate = new Button { Text = "Сгенерировать", DialogResult = DialogResult.OK };
+        var btnCancel = new Button { Text = "Отмена", DialogResult = DialogResult.Cancel };
+
+        var buttonPanel = new FlowLayoutPanel
+        {
+            FlowDirection = FlowDirection.RightToLeft,
+            Dock = DockStyle.Bottom,
+            Height = 40
+        };
+        buttonPanel.Controls.AddRange(new Control[] { btnGenerate, btnCancel });
+
+        patternDialog.Controls.Add(layout);
+        patternDialog.Controls.Add(buttonPanel);
+        patternDialog.AcceptButton = btnGenerate;
+        patternDialog.CancelButton = btnCancel;
+
+        if (patternDialog.ShowDialog() == DialogResult.OK)
+        {
+            currentPatternType = (PatternType)Enum.Parse(typeof(PatternType), cmbPatternType.SelectedItem.ToString());
+            elementSize = (int)numElementSize.Value;
+            patternWidth = (int)numWidth.Value;
+            patternHeight = (int)numHeight.Value;
+
+            // Генерируем узор
+            var parameters = new PatternParameters(
+                currentPatternType,
+                primaryColor,
+                secondaryColor,
+                elementSize,
+                patternWidth,
+                patternHeight
+            );
+
+            var patternContainer = PatternGenerationService.GeneratePattern(parameters);
+
+            // Заменяем текущий контейнер сгенерированным
+            container.Palette.Clear();
+            foreach (var vertex in patternContainer.Palette)
+                container.Palette.Add(vertex);
+
+            container.Pixels.Clear();
+            foreach (var pixel in patternContainer.Pixels)
+                container.Pixels.Add(pixel);
+
+            canvas.Invalidate();
+
+            MessageBox.Show($"Узор '{currentPatternType}' сгенерирован!\n" +
+                           $"Размер: {patternWidth}x{patternHeight}\n" +
+                           $"Элементов: {container.Pixels.Count}");
+        }
+    }
     private void BtnLoad_Click(object? sender, EventArgs e)
     {
         using var ofd = new OpenFileDialog { Filter = "Hex container (*.hexc)|*.hexc|All files|*.*" };
