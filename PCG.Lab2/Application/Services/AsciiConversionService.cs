@@ -5,75 +5,79 @@ using System.Text;
 
 namespace Application.Services;
 
+// Сервис для преобразования между графическим контейнером и текстовым форматом
+// Конвертирует бинарные данные в читаемый текст и обратно
 public static class AsciiConversionService
 {
-    /// <summary>
-    /// Преобразует графический контейнер в ASCII-представление (JSON-подобный формат)
-    /// </summary>
+    // Преобразует графический контейнер в текстовый формат
+    // Создает структурированный текст с данными о палитре и пикселях
     public static string ConvertToAscii(GraphicContainer container)
     {
         var sb = new StringBuilder();
 
-        // Начало контейнера
+        // Заголовок контейнера
         sb.AppendLine("GRAPHIC_CONTAINER {");
         sb.AppendLine("  \"version\": \"1.0\",");
         sb.AppendLine("  \"type\": \"hex_palette_container\",");
 
-        // Палитра
+        // Блок с палитрой цветов
         sb.AppendLine("  \"palette\": [");
         for (int i = 0; i < container.Palette.Count; i++)
         {
             var vertex = container.Palette[i];
             sb.Append("    {");
             sb.Append($"\"index\": {i}, ");
-            sb.Append($"\"color\": \"{ColorToHex(vertex.Color)}\", ");
-            sb.Append($"\"position\": \"{PointFToBase64(vertex.Position)}\"");
+            sb.Append($"\"color\": \"{ColorToHex(vertex.Color)}\", "); // Цвет в HEX формате
+            sb.Append($"\"position\": \"{PointFToBase64(vertex.Position)}\""); // Координаты в Base64
             sb.Append(i < container.Palette.Count - 1 ? "},\n" : "}\n");
         }
         sb.AppendLine("  ],");
 
-        // Пиксели в двоичном виде
+        // Блок с пикселями
         sb.AppendLine("  \"pixels\": {");
-        sb.AppendLine($"    \"count\": {container.Pixels.Count},");
-        sb.AppendLine($"    \"data\": \"{PixelsToBase64(container.Pixels)}\"");
+        sb.AppendLine($"    \"count\": {container.Pixels.Count},"); // Количество пикселей
+        sb.AppendLine($"    \"data\": \"{PixelsToBase64(container.Pixels)}\""); // Данные пикселей в Base64
         sb.AppendLine("  }");
 
-        // Конец контейнера
+        // Конец файла
         sb.AppendLine("}");
 
         return sb.ToString();
     }
 
-    /// <summary>
-    /// Преобразует ASCII-представление обратно в графический контейнер
-    /// </summary>
+    // Восстанавливает графический контейнер из текстового формата
+    // Читает и парсит текстовый файл, создает объект контейнера
     public static GraphicContainer ConvertFromAscii(string asciiContent)
     {
         var container = new GraphicContainer();
 
         var lines = asciiContent.Split('\n');
-        bool inPalette = false;
-        bool inPixels = false;
+        bool inPalette = false; // Флаг что мы в блоке палитры
+        bool inPixels = false;  // Флаг что мы в блоке пикселей
         var paletteData = new List<string>();
         string pixelData = "";
         int pixelCount = 0;
 
+        // Построчно читаем файл
         foreach (var line in lines)
         {
             var trimmed = line.Trim();
 
+            // Начало блока палитры
             if (trimmed.StartsWith("\"palette\": ["))
             {
                 inPalette = true;
                 continue;
             }
 
+            // Конец блока палитры
             if (inPalette && trimmed == "],")
             {
                 inPalette = false;
                 continue;
             }
 
+            // Читаем данные пикселей
             if (trimmed.StartsWith("\"data\":"))
             {
                 var parts = trimmed.Split(':');
@@ -83,6 +87,7 @@ public static class AsciiConversionService
                 }
             }
 
+            // Читаем количество пикселей
             if (trimmed.StartsWith("\"count\":"))
             {
                 var parts = trimmed.Split(':');
@@ -92,13 +97,14 @@ public static class AsciiConversionService
                 }
             }
 
+            // Собираем строки с данными палитры
             if (inPalette && trimmed.StartsWith("{"))
             {
                 paletteData.Add(trimmed.TrimEnd(','));
             }
         }
 
-        // Восстанавливаем палитру
+        // Восстанавливаем палитру из собранных данных
         foreach (var paletteLine in paletteData)
         {
             var vertex = ParsePaletteVertex(paletteLine);
@@ -108,7 +114,7 @@ public static class AsciiConversionService
             }
         }
 
-        // Восстанавливаем пиксели
+        // Восстанавливаем пиксели из Base64 данных
         if (!string.IsNullOrEmpty(pixelData) && pixelCount > 0)
         {
             var pixels = ParsePixelsFromBase64(pixelData, pixelCount);
@@ -121,11 +127,13 @@ public static class AsciiConversionService
         return container;
     }
 
+    // Преобразует цвет в HEX строку (например: FF0000 для красного)
     private static string ColorToHex(Color color)
     {
         return $"{color.R:X2}{color.G:X2}{color.B:X2}";
     }
 
+    // Преобразует HEX строку обратно в цвет
     private static Color HexToColor(string hex)
     {
         if (hex.Length != 6)
@@ -138,6 +146,8 @@ public static class AsciiConversionService
         return Color.FromArgb(r, g, b);
     }
 
+    // Преобразует координаты точки в Base64 строку
+    // Нужно потому что координаты - это числа с плавающей точкой
     private static string PointFToBase64(PointF point)
     {
         var bytes = new byte[8];
@@ -146,6 +156,7 @@ public static class AsciiConversionService
         return Convert.ToBase64String(bytes);
     }
 
+    // Восстанавливает координаты точки из Base64 строки
     private static PointF Base64ToPointF(string base64)
     {
         var bytes = Convert.FromBase64String(base64);
@@ -154,6 +165,8 @@ public static class AsciiConversionService
         return new PointF(x, y);
     }
 
+    // Преобразует список пикселей в Base64 строку
+    // Каждый пиксель - это две координаты (X, Y)
     private static string PixelsToBase64(List<Pixel> pixels)
     {
         var byteList = new List<byte>();
@@ -167,6 +180,7 @@ public static class AsciiConversionService
         return Convert.ToBase64String(byteList.ToArray());
     }
 
+    // Восстанавливает список пикселей из Base64 строки
     private static List<Pixel> ParsePixelsFromBase64(string base64, int count)
     {
         var pixels = new List<Pixel>();
@@ -174,7 +188,7 @@ public static class AsciiConversionService
 
         for (int i = 0; i < count; i++)
         {
-            int byteOffset = i * 8;
+            int byteOffset = i * 8; // 8 байт на пиксель (4 на X + 4 на Y)
             if (byteOffset + 7 >= bytes.Length)
                 break;
 
@@ -187,15 +201,18 @@ public static class AsciiConversionService
         return pixels;
     }
 
+    // Парсит одну строку с данными вершины палитры
+    // Формат: {"index": 0, "color": "FF0000", "position": "Base64Data"}
     private static ColorVertex? ParsePaletteVertex(string line)
     {
         try
         {
-            // Упрощенный парсинг JSON-подобной строки
+            // Разбиваем строку на части
             var parts = line.Trim('{', '}').Split(',');
             string colorHex = "";
             string positionBase64 = "";
 
+            // Ищем цвет и координаты
             foreach (var part in parts)
             {
                 var keyValue = part.Split(':');
@@ -215,6 +232,7 @@ public static class AsciiConversionService
                 }
             }
 
+            // Если нашли оба значения - создаем вершину
             if (!string.IsNullOrEmpty(colorHex) && !string.IsNullOrEmpty(positionBase64))
             {
                 var color = HexToColor(colorHex);
@@ -224,7 +242,7 @@ public static class AsciiConversionService
         }
         catch
         {
-            // В случае ошибки пропускаем эту вершину
+            // Если ошибка - пропускаем эту вершину
         }
 
         return null;

@@ -25,6 +25,9 @@ public static class User32Service
     public const int SW_SHOW = 5;
     public const int SW_HIDE = 0;
 
+    // IDC_ARROW
+    public const int IDC_ARROW = 32512;
+
     [DllImport("user32.dll", SetLastError = true)]
     public static extern IntPtr CreateWindowEx(
         uint dwExStyle,
@@ -50,7 +53,7 @@ public static class User32Service
     [DllImport("user32.dll", SetLastError = true)]
     public static extern bool UpdateWindow(IntPtr hWnd);
 
-    [DllImport("user32.dll", SetLastError = true)]
+    [DllImport("user32.dll")]
     public static extern IntPtr LoadCursor(IntPtr hInstance, int lpCursorName);
 
     [DllImport("user32.dll", SetLastError = true)]
@@ -74,7 +77,6 @@ public static class User32Service
     [DllImport("user32.dll")]
     public static extern int ReleaseDC(IntPtr hWnd, IntPtr hDC);
 
-    // ДОБАВЛЯЕМ НЕДОСТАЮЩИЕ ФУНКЦИИ:
     [DllImport("user32.dll")]
     public static extern bool InvalidateRect(IntPtr hWnd, IntPtr lpRect, bool bErase);
 
@@ -84,12 +86,12 @@ public static class User32Service
     [DllImport("user32.dll")]
     public static extern int FillRect(IntPtr hDC, ref RECT lprc, IntPtr hbr);
 
-    [StructLayout(LayoutKind.Sequential)]
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     public struct WNDCLASSEX
     {
         public uint cbSize;
         public uint style;
-        public IntPtr lpfnWndProc;
+        public WndProc lpfnWndProc;
         public int cbClsExtra;
         public int cbWndExtra;
         public IntPtr hInstance;
@@ -119,7 +121,6 @@ public static class User32Service
         public int Y;
     }
 
-    // ДОБАВЛЯЕМ СТРУКТУРУ RECT
     [StructLayout(LayoutKind.Sequential)]
     public struct RECT
     {
@@ -128,4 +129,7 @@ public static class User32Service
         public int right;
         public int bottom;
     }
+
+    // Делегат для оконной процедуры - ДОЛЖЕН БЫТЬ ЗДЕСЬ
+    public delegate IntPtr WndProc(IntPtr hWnd, uint uMsg, IntPtr wParam, IntPtr lParam);
 }
