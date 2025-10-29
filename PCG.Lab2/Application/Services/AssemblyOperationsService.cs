@@ -1,52 +1,45 @@
-﻿// Application/Services/AssemblyOperationsService.cs
-using System.Runtime.InteropServices;
+﻿using System.Runtime.InteropServices;
 
 namespace Application.Services;
 
 public static unsafe class AssemblyOperationsService
 {
-    /// <summary>
-    /// Сложение двух целых чисел через ассемблерную вставку
-    /// </summary>
+    // -------------------- Целочисленные операции --------------------
+
+    // Сложение двух целых чисел
     public static int AddInt(int a, int b)
     {
         int result;
         unchecked
         {
-            result = a + b; // Для демонстрации, в реальности будет ассемблер
+            result = a + b; // Симулируется ассемблерная вставка
         }
         return result;
     }
 
-    /// <summary>
-    /// Вычитание двух целых чисел через ассемблерную вставку
-    /// </summary>
+    // Вычитание двух целых чисел
     public static int SubtractInt(int a, int b)
     {
         int result;
         unchecked
         {
-            result = a - b; // Для демонстрации, в реальности будет ассемблер
+            result = a - b;
         }
         return result;
     }
 
-    /// <summary>
-    /// Умножение двух целых чисел через ассемблерную вставку
-    /// </summary>
+    // Умножение двух целых чисел
     public static int MultiplyInt(int a, int b)
     {
         int result;
         unchecked
         {
-            result = a * b; // Для демонстрации, в реальности будет ассемблер
+            result = a * b;
         }
         return result;
     }
 
-    /// <summary>
-    /// Целочисленное деление через ассемблерную вставку
-    /// </summary>
+    // Деление двух целых чисел (с проверкой на деление на ноль)
     public static int DivideInt(int a, int b)
     {
         if (b == 0)
@@ -54,237 +47,166 @@ public static unsafe class AssemblyOperationsService
         int result;
         unchecked
         {
-            result = a / b; // Для демонстрации, в реальности будет ассемблер
+            result = a / b;
         }
         return result;
     }
 
-    /// <summary>
-    /// Побитовое И через ассемблерную вставку
-    /// </summary>
+    // Побитовое И
     public static int BitwiseAnd(int a, int b)
     {
         int result;
         unchecked
-        {
-            result = a & b; // Для демонстрации, в реальности будет ассемблер
-        }
+        { result = a & b; }
         return result;
     }
 
-    /// <summary>
-    /// Побитовое ИЛИ через ассемблерную вставку
-    /// </summary>
+    // Побитовое ИЛИ
     public static int BitwiseOr(int a, int b)
     {
         int result;
         unchecked
-        {
-            result = a | b; // Для демонстрации, в реальности будет ассемблер
-        }
+        { result = a | b; }
         return result;
     }
 
-    /// <summary>
-    /// Побитовое исключающее ИЛИ через ассемблерную вставку
-    /// </summary>
+    // Побитовое исключающее ИЛИ
     public static int BitwiseXor(int a, int b)
     {
         int result;
         unchecked
-        {
-            result = a ^ b; // Для демонстрации, в реальности будет ассемблер
-        }
+        { result = a ^ b; }
         return result;
     }
 
-    /// <summary>
-    /// Побитовый сдвиг влево через ассемблерную вставку
-    /// </summary>
+    // Сдвиг влево
     public static int ShiftLeft(int a, int shift)
     {
         int result;
         unchecked
-        {
-            result = a << shift; // Для демонстрации, в реальности будет ассемблер
-        }
+        { result = a << shift; }
         return result;
     }
 
-    /// <summary>
-    /// Побитовый сдвиг вправо через ассемблерную вставку
-    /// </summary>
+    // Сдвиг вправо
     public static int ShiftRight(int a, int shift)
     {
         int result;
         unchecked
-        {
-            result = a >> shift; // Для демонстрации, в реальности будет ассемблер
-        }
+        { result = a >> shift; }
         return result;
     }
 
-    /// <summary>
-    /// Сложение двух вещественных чисел через ассемблерную вставку
-    /// </summary>
+    // -------------------- Вещественные операции --------------------
+
+    // Сложение двух float
     public static float AddFloat(float a, float b)
     {
         float result;
         unchecked
-        {
-            result = a + b; // Для демонстрации, в реальности будет ассемблер
-        }
+        { result = a + b; }
         return result;
     }
 
-    /// <summary>
-    /// Вычитание двух вещественных чисел через ассемблерную вставку
-    /// </summary>
+    // Вычитание двух float
     public static float SubtractFloat(float a, float b)
     {
         float result;
         unchecked
-        {
-            result = a - b; // Для демонстрации, в реальности будет ассемблер
-        }
+        { result = a - b; }
         return result;
     }
 
-    /// <summary>
-    /// Умножение двух вещественных чисел через ассемблерную вставку
-    /// </summary>
+    // Умножение двух float
     public static float MultiplyFloat(float a, float b)
     {
         float result;
         unchecked
-        {
-            result = a * b; // Для демонстрации, в реальности будет ассемблер
-        }
+        { result = a * b; }
         return result;
     }
 
-    /// <summary>
-    /// Деление двух вещественных чисел через ассемблерную вставку
-    /// </summary>
+    // Деление двух float (с защитой от деления на ноль)
     public static float DivideFloat(float a, float b)
     {
         if (Math.Abs(b) < 0.0001f)
             return 0f;
         float result;
         unchecked
-        {
-            result = a / b; // Для демонстрации, в реальности будет ассемблер
-        }
+        { result = a / b; }
         return result;
     }
 
-    /// <summary>
-    /// Преобразование float в int через ассемблерную вставку
-    /// </summary>
+    // -------------------- Конвертация --------------------
+
+    // Преобразование float в int
     public static int FloatToInt(float value)
     {
         int result;
         unchecked
-        {
-            result = (int)value; // Для демонстрации, в реальности будет ассемблер
-        }
+        { result = (int)value; }
         return result;
     }
 
-    /// <summary>
-    /// Преобразование int в float через ассемблерную вставку
-    /// </summary>
+    // Преобразование int в float
     public static float IntToFloat(int value)
     {
         float result;
         unchecked
-        {
-            result = (float)value; // Для демонстрации, в реальности будет ассемблер
-        }
+        { result = (float)value; }
         return result;
     }
 
-    /// <summary>
-    /// Ограничение значения в диапазоне [min, max] через ассемблерные операции
-    /// </summary>
+    // -------------------- Вспомогательные операции --------------------
+
+    // Ограничение значения в диапазоне [min, max]
     public static int Clamp(int value, int min, int max)
     {
         int result = value;
-
-        // Используем ассемблерные операции для сравнения
         if (CompareLessThan(result, min))
             result = min;
-
         if (CompareGreaterThan(result, max))
             result = max;
-
         return result;
     }
 
-    /// <summary>
-    /// Сравнение на меньше через ассемблерную вставку
-    /// </summary>
+    // Сравнение a < b
     public static bool CompareLessThan(int a, int b)
     {
         bool result;
         unchecked
-        {
-            result = a < b; // Для демонстрации, в реальности будет ассемблер
-        }
+        { result = a < b; }
         return result;
     }
 
-    /// <summary>
-    /// Сравнение на больше через ассемблерную вставку
-    /// </summary>
+    // Сравнение a > b
     public static bool CompareGreaterThan(int a, int b)
     {
         bool result;
         unchecked
-        {
-            result = a > b; // Для демонстрации, в реальности будет ассемблер
-        }
+        { result = a > b; }
         return result;
     }
 
-    /// <summary>
-    /// Абсолютное значение через ассемблерные операции
-    /// </summary>
+    // Абсолютное значение через битовые операции
     public static int Abs(int value)
     {
-        int result;
-        unchecked
-        {
-            // Используем битовые операции для получения абсолютного значения
-            int mask = value >> 31;
-            result = (value + mask) ^ mask;
-        }
+        int mask = value >> 31; // Получаем знак числа
+        int result = (value + mask) ^ mask; // Убираем знак
         return result;
     }
 
-    /// <summary>
-    /// Максимум из двух чисел через ассемблерные операции
-    /// </summary>
+    // Максимум из двух чисел через битовые операции
     public static int Max(int a, int b)
     {
-        int result;
-        unchecked
-        {
-            result = a - ((a - b) & ((a - b) >> 31));
-        }
+        int result = a - ((a - b) & ((a - b) >> 31));
         return result;
     }
 
-    /// <summary>
-    /// Минимум из двух чисел через ассемблерные операции
-    /// </summary>
+    // Минимум из двух чисел через битовые операции
     public static int Min(int a, int b)
     {
-        int result;
-        unchecked
-        {
-            result = b + ((a - b) & ((a - b) >> 31));
-        }
+        int result = b + ((a - b) & ((a - b) >> 31));
         return result;
     }
 }

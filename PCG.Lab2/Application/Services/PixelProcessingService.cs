@@ -1,34 +1,35 @@
-﻿// Application/Services/PixelProcessingService.cs
-using Domain.Entities;
+﻿using Domain.Entities;
 using System.Drawing;
 
 namespace Application.Services;
 
 public static class PixelProcessingService
 {
-    // returns System.Drawing.Color
+    // Получает цвет пикселя из GraphicContainer на основе его позиции и палитры
     public static Color GetColorFromPixel(Pixel pixel, GraphicContainer container)
     {
+        // Если контейнер пустой или палитра пуста, возвращаем черный цвет
         if (container == null || container.Palette.Count == 0)
             return Color.Black;
 
-        // Используем ассемблерные операции для математических вычислений
-        double angle = Math.Atan2(pixel.Y, pixel.X); // -pi..pi
+        // Вычисляем угол пикселя относительно центра (0,0)
+        double angle = Math.Atan2(pixel.Y, pixel.X); // -π..π
 
-        // Приведение угла к диапазону [0, 2pi] с использованием ассемблерных операций
+        // Приведение угла к диапазону [0, 2π]
         if (AssemblyOperationsService.CompareLessThan((int)angle, 0))
         {
             angle = AssemblyOperationsService.AddFloat((float)angle, (float)(2 * Math.PI));
         }
 
-        // Вычисление радиуса с использованием ассемблерных операций
+        // Вычисление радиуса (дистанции от центра)
         double radiusSquared = AssemblyOperationsService.AddFloat(
             AssemblyOperationsService.MultiplyFloat(pixel.X, pixel.X),
             AssemblyOperationsService.MultiplyFloat(pixel.Y, pixel.Y)
         );
-        double radius = Math.Sqrt(radiusSquared); // 0..
+        double radius = Math.Sqrt(radiusSquared);
         radius = AssemblyOperationsService.CompareLessThan((int)radius, 1) ? radius : 1.0;
 
+        // Преобразуем палитру в список углов и цветов
         var verts = new List<(Color color, double angle)>();
         foreach (var v in container.Palette)
         {
@@ -37,14 +38,16 @@ public static class PixelProcessingService
                 a = AssemblyOperationsService.AddFloat((float)a, (float)(2 * Math.PI));
             verts.Add((v.Color, a));
         }
+
+        // Сортируем вершины по углу
         verts.Sort((a, b) => a.angle.CompareTo(b.angle));
 
-        // If palette has fewer than 2 vertices, fallback
+        // Если палитра содержит только одну вершину
         if (verts.Count == 1)
         {
             var c = verts[0].color;
 
-            // Используем ассемблерные операции для вычисления цветов
+            // Пропорционально радиусу вычисляем цвет
             int rr = AssemblyOperationsService.MultiplyInt(c.R, (int)radius);
             int gg = AssemblyOperationsService.MultiplyInt(c.G, (int)radius);
             int bb = AssemblyOperationsService.MultiplyInt(c.B, (int)radius);
@@ -55,10 +58,12 @@ public static class PixelProcessingService
                 AssemblyOperationsService.Clamp(bb, 0, 255)
             );
         }
+
+        // Если палитра пуста, возвращаем черный цвет
         if (verts.Count == 0)
             return Color.Black;
 
-        // find sector
+        // Находим сектор (между какими вершинами находится угол пикселя)
         int sector = 0;
         for (int i = 0; i < verts.Count; i++)
         {
@@ -85,7 +90,7 @@ public static class PixelProcessingService
         double aA = vA.angle;
         double aB = vB.angle;
 
-        // Вычисление span и rel с использованием ассемблерных операций
+        // Вычисление углового диапазона и относительной позиции
         double span = aB - aA;
         if (AssemblyOperationsService.CompareLessThan((int)span, 0))
             span = AssemblyOperationsService.AddFloat((float)span, (float)(2 * Math.PI));
@@ -96,7 +101,7 @@ public static class PixelProcessingService
 
         double t = span == 0 ? 0 : AssemblyOperationsService.DivideFloat((float)rel, (float)span);
 
-        // Интерполяция цветов с использованием ассемблерных операций
+        // Интерполяция цвета между двумя вершинами
         int r = (int)(
             AssemblyOperationsService.AddFloat(
                 AssemblyOperationsService.MultiplyFloat(vA.color.R, (float)(1 - t)),
@@ -116,11 +121,12 @@ public static class PixelProcessingService
             )
         );
 
-        // Умножение на радиус с использованием ассемблерных операций
+        // Умножаем цвет на радиус для градиентного эффекта
         int finalR = AssemblyOperationsService.MultiplyInt(r, (int)radius);
         int finalG = AssemblyOperationsService.MultiplyInt(g, (int)radius);
         int finalB = AssemblyOperationsService.MultiplyInt(b, (int)radius);
 
+        // Ограничиваем значения 0..255 и возвращаем цвет
         return Color.FromArgb(
             AssemblyOperationsService.Clamp(finalR, 0, 255),
             AssemblyOperationsService.Clamp(finalG, 0, 255),

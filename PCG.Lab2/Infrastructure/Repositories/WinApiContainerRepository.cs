@@ -1,5 +1,4 @@
-﻿// Infrastructure/Repositories/WinApiContainerRepository.cs
-using Application.Interfaces;
+﻿using Application.Interfaces;
 using Domain.Entities;
 using Infrastructure.WinApi;
 using System.Drawing;
@@ -10,69 +9,80 @@ namespace Infrastructure.Repositories;
 
 public class WinApiContainerRepository : IContainerRepository
 {
+    // Сохраняет GraphicContainer в файл через прямой вызов WinAPI (Kernel32)
     public void Save(string path, GraphicContainer container)
     {
+        // Создаем файл с правами на запись, перезаписывая существующий
         IntPtr hFile = Kernel32Service.CreateFile(
             path,
-            Kernel32Service.GENERIC_WRITE,
-            0,
-            IntPtr.Zero,
-            Kernel32Service.CREATE_ALWAYS,
-            Kernel32Service.FILE_ATTRIBUTE_NORMAL,
-            IntPtr.Zero);
+            Kernel32Service.GENERIC_WRITE, // Права на запись
+            0,                              // Режим совместного использования (нет)
+            IntPtr.Zero,                    // Атрибуты безопасности
+            Kernel32Service.CREATE_ALWAYS,  // Перезаписать существующий файл
+            Kernel32Service.FILE_ATTRIBUTE_NORMAL, // Обычный файл
+            IntPtr.Zero);                   // Шаблонный файл не используется
 
+        // Проверяем дескриптор файла
         if (hFile == IntPtr.Zero || hFile == new IntPtr(-1))
             throw new Exception($"Ошибка создания файла: {Kernel32Service.GetLastError()}");
 
         try
         {
-            using var stream = new MemoryStream();
+            using var stream = new MemoryStream(); // Буфер в памяти
             using var writer = new BinaryWriter(stream);
 
-            // Записываем палитру
-            writer.Write(container.Palette.Count);
+            // Сохраняем палитру цветов
+            writer.Write(container.Palette.Count); // Количество вершин палитры
             foreach (var vertex in container.Palette)
             {
-                writer.Write((byte)vertex.Color.R);
-                writer.Write((byte)vertex.Color.G);
-                writer.Write((byte)vertex.Color.B);
-                writer.Write(vertex.Position.X);
-                writer.Write(vertex.Position.Y);
+                writer.Write((byte)vertex.Color.R); // Красный
+                writer.Write((byte)vertex.Color.G); // Зеленый
+                writer.Write((byte)vertex.Color.B); // Синий
+                writer.Write(vertex.Position.X);    // X позиции
+                writer.Write(vertex.Position.Y);    // Y позиции
             }
 
-            // Записываем пиксели
-            writer.Write(container.Pixels.Count);
+            // Сохраняем пиксели
+            writer.Write(container.Pixels.Count); // Количество пикселей
             foreach (var pixel in container.Pixels)
             {
-                writer.Write(pixel.X);
-                writer.Write(pixel.Y);
+                writer.Write(pixel.X); // X координата
+                writer.Write(pixel.Y); // Y координата
             }
 
+            // Получаем массив байт для записи в файл
             byte[] data = stream.ToArray();
             uint bytesWritten;
+
+            // Записываем данные в файл через WinAPI
             bool success = Kernel32Service.WriteFile(hFile, data, (uint)data.Length, out bytesWritten, IntPtr.Zero);
 
+            // Проверка успешности записи
             if (!success || bytesWritten != data.Length)
                 throw new Exception($"Ошибка записи в файл: {Kernel32Service.GetLastError()}");
         }
         finally
         {
+            // Всегда закрываем дескриптор файла
             if (hFile != IntPtr.Zero && hFile != new IntPtr(-1))
                 Kernel32Service.CloseHandle(hFile);
         }
     }
 
+    // Загружает GraphicContainer из файла через WinAPI
     public GraphicContainer Load(string path)
     {
+        // Открываем существующий файл с правами на чтение
         IntPtr hFile = Kernel32Service.CreateFile(
             path,
-            Kernel32Service.GENERIC_READ,
-            0,
-            IntPtr.Zero,
-            Kernel32Service.OPEN_EXISTING,
+            Kernel32Service.GENERIC_READ,  // Права на чтение
+            0,                              // Режим совместного использования (нет)
+            IntPtr.Zero,                    // Атрибуты безопасности
+            Kernel32Service.OPEN_EXISTING,  // Открыть существующий файл
             Kernel32Service.FILE_ATTRIBUTE_NORMAL,
             IntPtr.Zero);
 
+        // Проверка дескриптора файла
         if (hFile == IntPtr.Zero || hFile == new IntPtr(-1))
             throw new Exception($"Ошибка открытия файла: {Kernel32Service.GetLastError()}");
 
@@ -80,9 +90,10 @@ public class WinApiContainerRepository : IContainerRepository
         {
             var container = new GraphicContainer();
 
-            // Читаем данные файла
-            byte[] buffer = new byte[4096];
+            // Чтение данных файла
+            byte[] buffer = new byte[4096]; // Буфер на 4КБ
             uint bytesRead;
+
             bool success = Kernel32Service.ReadFile(hFile, buffer, (uint)buffer.Length, out bytesRead, IntPtr.Zero);
 
             if (!success)
@@ -116,6 +127,7 @@ public class WinApiContainerRepository : IContainerRepository
         }
         finally
         {
+            // Закрываем дескриптор файла
             if (hFile != IntPtr.Zero && hFile != new IntPtr(-1))
                 Kernel32Service.CloseHandle(hFile);
         }

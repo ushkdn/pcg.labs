@@ -1,13 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿namespace Domain.Entities;
 
-namespace Domain.Entities;
+// Параметры цветовой трансформации для графических объектов
 public record ColorTransformationParameters(
-    int Brightness = 0,
-    float Contrast = 1.0f,
-    float Saturation = 1.0f,
-    float Hue = 0f
+    int Brightness = 0,   // Яркость: 0 = без изменений, положительное/отрицательное значение увеличивает/уменьшает яркость
+    float Contrast = 1.0f, // Контраст: 1.0 = без изменений, >1 = увеличение контраста, <1 = снижение
+    float Saturation = 1.0f, // Насыщенность: 1.0 = без изменений, >1 = более насыщенные цвета, <1 = приглушённые
+    float Hue = 0f         // Оттенок: смещение цвета в градусах или радианах (в зависимости от реализации)
 );

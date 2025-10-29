@@ -1,5 +1,4 @@
-﻿// Application/Services/TransformationService.cs
-using Domain.Entities;
+﻿using Domain.Entities;
 using System.Drawing;
 
 namespace Application.Services;
@@ -7,19 +6,19 @@ namespace Application.Services;
 public static class TransformationService
 {
     /// <summary>
-    /// Применяет все активные преобразования к графическому контейнеру
+    /// Применяет все активные пространственные преобразования к графическому контейнеру
     /// </summary>
     public static GraphicContainer ApplyTransformations(GraphicContainer container, TransformationParameters parameters)
     {
         var result = new GraphicContainer();
 
-        // Копируем палитру
+        // Копируем палитру без изменений
         foreach (var vertex in container.Palette)
         {
             result.Palette.Add(new ColorVertex(vertex.Color, vertex.Position));
         }
 
-        // Применяем преобразования к пикселям с использованием ассемблерных операций
+        // Применяем преобразования к каждому пикселю
         foreach (var pixel in container.Pixels)
         {
             var transformedPixel = ApplySinglePixelTransformations(pixel, parameters);
@@ -29,6 +28,7 @@ public static class TransformationService
         return result;
     }
 
+    // Применяет масштаб, поворот, сдвиг и отражение к одному пикселю
     private static Pixel ApplySinglePixelTransformations(Pixel pixel, TransformationParameters parameters)
     {
         float x = pixel.X;
@@ -38,7 +38,7 @@ public static class TransformationService
         x = AssemblyOperationsService.MultiplyFloat(x, parameters.Scale);
         y = AssemblyOperationsService.MultiplyFloat(y, parameters.Scale);
 
-        // Поворот через ассемблерные операции
+        // Поворот через ассемблерные операции (если угол != 0)
         if (AssemblyOperationsService.CompareGreaterThan((int)parameters.Rotation, 0) ||
             AssemblyOperationsService.CompareLessThan((int)parameters.Rotation, 0))
         {
@@ -62,11 +62,11 @@ public static class TransformationService
             y = newY;
         }
 
-        // Сдвиг через ассемблерные операции
+        // Сдвиг по осям
         x = AssemblyOperationsService.AddFloat(x, parameters.OffsetX);
         y = AssemblyOperationsService.AddFloat(y, parameters.OffsetY);
 
-        // Отражение через ассемблерные операции
+        // Отражение по осям
         if (parameters.MirrorX)
             x = AssemblyOperationsService.MultiplyFloat(x, -1f);
         if (parameters.MirrorY)
@@ -76,7 +76,7 @@ public static class TransformationService
     }
 
     /// <summary>
-    /// Применяет цветовые преобразования
+    /// Применяет цветовые преобразования (яркость, контраст, насыщенность, оттенок)
     /// </summary>
     public static List<Color> ApplyColorTransformations(GraphicContainer container, ColorTransformationParameters parameters)
     {
@@ -84,7 +84,10 @@ public static class TransformationService
 
         foreach (var pixel in container.Pixels)
         {
+            // Получаем исходный цвет пикселя из палитры
             var originalColor = PixelProcessingService.GetColorFromPixel(pixel, container);
+
+            // Применяем трансформации цвета
             var transformedColor = ApplySingleColorTransformations(originalColor, parameters);
             modifiedColors.Add(transformedColor);
         }
@@ -92,18 +95,19 @@ public static class TransformationService
         return modifiedColors;
     }
 
+    // Применяет цветовые преобразования к одному цвету
     public static Color ApplySingleColorTransformations(Color color, ColorTransformationParameters parameters)
     {
         int r = color.R;
         int g = color.G;
         int b = color.B;
 
-        // Яркость через ассемблерные операции
+        // Изменение яркости
         r = AssemblyOperationsService.AddInt(r, parameters.Brightness);
         g = AssemblyOperationsService.AddInt(g, parameters.Brightness);
         b = AssemblyOperationsService.AddInt(b, parameters.Brightness);
 
-        // Контрастность через ассемблерные операции
+        // Изменение контраста
         r = AssemblyOperationsService.Clamp(
             AssemblyOperationsService.AddInt(
                 128,
@@ -132,7 +136,7 @@ public static class TransformationService
             ), 0, 255
         );
 
-        // Насыщенность через ассемблерные операции
+        // Изменение насыщенности
         float gray = AssemblyOperationsService.DivideFloat(
             AssemblyOperationsService.AddInt(AssemblyOperationsService.AddInt(r, g), b),
             3.0f
@@ -165,7 +169,7 @@ public static class TransformationService
             ), 0, 255
         );
 
-        // Оттенок через ассемблерные операции
+        // Изменение оттенка (Hue)
         if (AssemblyOperationsService.CompareGreaterThan((int)parameters.Hue, 0) ||
             AssemblyOperationsService.CompareLessThan((int)parameters.Hue, 0))
         {

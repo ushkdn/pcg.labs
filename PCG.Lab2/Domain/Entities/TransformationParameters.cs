@@ -1,15 +1,11 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿namespace Domain.Entities;
 
-namespace Domain.Entities;
+// Параметры трансформации для графических объектов
 public record TransformationParameters(
-    float Scale = 1.0f,
-    float Rotation = 0f,
-    float OffsetX = 0f,
-    float OffsetY = 0f,
-    bool MirrorX = false,
-    bool MirrorY = false
+    float Scale = 1.0f,      // Масштаб: 1.0 = оригинальный размер, >1 = увеличение, <1 = уменьшение
+    float Rotation = 0f,     // Поворот в градусах (или радианах, в зависимости от контекста)
+    float OffsetX = 0f,      // Смещение по оси X
+    float OffsetY = 0f,      // Смещение по оси Y
+    bool MirrorX = false,     // Отражение по горизонтали
+    bool MirrorY = false      // Отражение по вертикали
 );
