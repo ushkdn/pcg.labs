@@ -15,6 +15,10 @@ public partial class Form1 : Form
     private readonly Button btnSave;
     private readonly Button btnContrast;
     private readonly Button btnLoad;
+    private readonly Button btnSaveAscii;
+    private readonly Button btnLoadAscii;
+    private readonly Button btnShowAscii;
+    private readonly AsciiContainerService asciiService;
     private readonly Label lblInfo;
     private readonly Random rnd = new Random();
     private readonly Button btnGeneratePattern;
@@ -45,10 +49,48 @@ public partial class Form1 : Form
         btnContrast = new Button { Text = "Изменить контраст", Location = new Point(620, 220), Width = 140 };
         Controls.Add(btnContrast);
         btnContrast.Click += BtnContrast_Click;
+        var asciiRepository = new AsciiContainerRepository();
+        asciiService = new AsciiContainerService(asciiRepository);
+
+        // Добавляем кнопки для работы с ASCII
+        btnSaveAscii = new Button
+        {
+            Text = "Сохранить как ASCII",
+            Location = new Point(620, 380),
+            Width = 140
+        };
+
+        btnLoadAscii = new Button
+        {
+            Text = "Загрузить из ASCII",
+            Location = new Point(620, 420),
+            Width = 140
+        };
+
+        btnShowAscii = new Button
+        {
+            Text = "Показать ASCII",
+            Location = new Point(620, 460),
+            Width = 140
+        };
+
+        Controls.Add(btnSaveAscii);
+        Controls.Add(btnLoadAscii);
+        Controls.Add(btnShowAscii);
+
+        btnSaveAscii.Click += BtnSaveAscii_Click;
+        btnLoadAscii.Click += BtnLoadAscii_Click;
+        btnShowAscii.Click += BtnShowAscii_Click;
+
+        // Обновляем информацию
+
 
 
         lblInfo = new Label { Text = "ЛКМ: добавить пиксель\nПКМ: удалить ближайший\nРедактировать палитру — изменить вершины", Location = new Point(620, 230), Width = 160, Height = 80 };
-
+        lblInfo.Text = "ЛКМ: добавить пиксель\nПКМ: удалить ближайший\n" +
+              "Редактировать палитру — изменить вершины\n" +
+              "ASCII: текстовое представление контейнера";
+        lblInfo.Height = 100;
         canvas = new Panel
         {
             Location = new Point(20, 20),
@@ -79,6 +121,119 @@ public partial class Form1 : Form
         CreateDefaultPalette();
     }
 
+    private void BtnSaveAscii_Click(object? sender, EventArgs e)
+    {
+        using var sfd = new SaveFileDialog
+        {
+            Filter = "ASCII container (*.asciic)|*.asciic|Text files (*.txt)|*.txt|All files|*.*",
+            FileName = "container.asciic"
+        };
+
+        if (sfd.ShowDialog() == DialogResult.OK)
+        {
+            try
+            {
+                asciiService.SaveAsAscii(sfd.FileName, container);
+                MessageBox.Show($"ASCII контейнер сохранен!\nФайл: {sfd.FileName}\n\n" +
+                               $"Палитра: {container.Palette.Count} цветов\n" +
+                               $"Пикселей: {container.Pixels.Count}");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка сохранения ASCII: {ex.Message}");
+            }
+        }
+    }
+
+    private void BtnLoadAscii_Click(object? sender, EventArgs e)
+    {
+        using var ofd = new OpenFileDialog
+        {
+            Filter = "ASCII container (*.asciic)|*.asciic|Text files (*.txt)|*.txt|All files|*.*"
+        };
+
+        if (ofd.ShowDialog() == DialogResult.OK)
+        {
+            try
+            {
+                var loadedContainer = asciiService.LoadFromAscii(ofd.FileName);
+
+                // Заменяем текущий контейнер
+                container.Palette.Clear();
+                foreach (var vertex in loadedContainer.Palette)
+                    container.Palette.Add(vertex);
+
+                container.Pixels.Clear();
+                foreach (var pixel in loadedContainer.Pixels)
+                    container.Pixels.Add(pixel);
+
+                canvas.Invalidate();
+
+                MessageBox.Show($"ASCII контейнер загружен!\n\n" +
+                               $"Палитра: {container.Palette.Count} цветов\n" +
+                               $"Пикселей: {container.Pixels.Count}");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка загрузки ASCII: {ex.Message}");
+            }
+        }
+    }
+
+    private void BtnShowAscii_Click(object? sender, EventArgs e)
+    {
+        try
+        {
+            var asciiContent = asciiService.GetAsciiRepresentation(container);
+
+            using var previewDialog = new Form
+            {
+                Text = "ASCII представление контейнера",
+                Size = new Size(600, 500),
+                StartPosition = FormStartPosition.CenterParent,
+                Font = new Font("Consolas", 9)
+            };
+
+            var textBox = new TextBox
+            {
+                Multiline = true,
+                Dock = DockStyle.Fill,
+                ScrollBars = ScrollBars.Both,
+                Text = asciiContent,
+                ReadOnly = true,
+                WordWrap = false
+            };
+
+            var buttonPanel = new FlowLayoutPanel
+            {
+                FlowDirection = FlowDirection.RightToLeft,
+                Dock = DockStyle.Bottom,
+                Height = 40
+            };
+
+            var btnCopy = new Button { Text = "Копировать", Width = 100 };
+            var btnClose = new Button { Text = "Закрыть", Width = 80 };
+
+            btnCopy.Click += (s, e) =>
+            {
+                Clipboard.SetText(asciiContent);
+                MessageBox.Show("ASCII представление скопировано в буфер обмена");
+            };
+
+            btnClose.Click += (s, e) => previewDialog.Close();
+
+            buttonPanel.Controls.AddRange(new Control[] { btnClose, btnCopy });
+
+            previewDialog.Controls.Add(textBox);
+            previewDialog.Controls.Add(buttonPanel);
+
+            previewDialog.ShowDialog();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Ошибка отображения ASCII: {ex.Message}");
+        }
+    }
     private void BtnGeneratePattern_Click(object? sender, EventArgs e)
     {
         using var patternDialog = new Form
