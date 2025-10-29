@@ -2,7 +2,6 @@
 
 namespace Application.Interfaces;
 
-
 public interface IContainerRepository
 {
     void Save(string path, GraphicContainer graphicContainer);

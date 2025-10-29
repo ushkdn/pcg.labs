@@ -13,6 +13,7 @@ public partial class Form1 : Form
     private readonly Button btnEditPalette;
     private readonly Button btnClearPixels;
     private readonly Button btnSave;
+    private readonly Button btnContrast;
     private readonly Button btnLoad;
     private readonly Label lblInfo;
     private readonly Random rnd = new Random();
@@ -34,6 +35,10 @@ public partial class Form1 : Form
         btnClearPixels = new Button { Text = "Очистить пиксели", Location = new Point(620, 100), Width = 140 };
         btnSave = new Button { Text = "Сохранить контейнер", Location = new Point(620, 140), Width = 140 };
         btnLoad = new Button { Text = "Загрузить контейнер", Location = new Point(620, 180), Width = 140 };
+        btnContrast = new Button { Text = "Изменить контраст", Location = new Point(620, 220), Width = 140 };
+        Controls.Add(btnContrast);
+        btnContrast.Click += BtnContrast_Click;
+
 
         lblInfo = new Label { Text = "ЛКМ: добавить пиксель\nПКМ: удалить ближайший\nРедактировать палитру — изменить вершины", Location = new Point(620, 230), Width = 160, Height = 80 };
 
@@ -82,6 +87,28 @@ public partial class Form1 : Form
             }
         }
     }
+
+    private void BtnContrast_Click(object? sender, EventArgs e)
+    {
+        var factor = 1.2; // например, +20% контраст
+        var modifiedColors = PixelModificationService.ModifyContrast(container, factor);
+
+        // можно просто визуализировать модифицированные пиксели поверх
+        var g = canvas.CreateGraphics();
+        var center = new PointF(canvas.Width / 2f, canvas.Height / 2f);
+
+        for (int i = 0; i < container.Pixels.Count; i++)
+        {
+            var px = container.Pixels[i];
+            var color = modifiedColors[i];
+            var screen = new PointF(center.X + px.X * radius, center.Y + px.Y * radius);
+            using var brush = new SolidBrush(color);
+            g.FillEllipse(brush, screen.X - 4, screen.Y - 4, 8, 8);
+        }
+
+        MessageBox.Show($"Контрастность изменена (x{factor:F1})");
+    }
+
 
     private void BtnSave_Click(object? sender, EventArgs e)
     {
@@ -203,8 +230,8 @@ public partial class Form1 : Form
         for (int i = 0; i < 6; i++)
         {
             double angle = Math.PI / 3.0 * i;
-            float px = center.X + (float)Math.Cos(angle) * _radius;
-            float py = center.Y + (float)Math.Sin(angle) * _radius;
+            float px = center.X + (float)Math.Cos(angle) * radius;
+            float py = center.Y + (float)Math.Sin(angle) * radius;
             hexPts[i] = new PointF(px, py);
         }
         using var pen = new Pen(Color.Gray, 2);
@@ -213,7 +240,7 @@ public partial class Form1 : Form
         // draw vertices
         foreach (var v in container.Palette)
         {
-            var screenPos = new PointF(center.X + v.Position.X * _radius, center.Y + v.Position.Y * _radius);
+            var screenPos = new PointF(center.X + v.Position.X * radius, center.Y + v.Position.Y * radius);
             using var brush = new SolidBrush(v.Color);
             g.FillEllipse(brush, screenPos.X - 10, screenPos.Y - 10, 20, 20);
             using var p = new Pen(Color.Black, 1);
@@ -225,8 +252,8 @@ public partial class Form1 : Form
         {
             var a = container.Palette[i];
             var b = container.Palette[(i + 1) % container.Palette.Count];
-            var sa = new PointF(center.X + a.Position.X * _radius, center.Y + a.Position.Y * _radius);
-            var sb = new PointF(center.X + b.Position.X * _radius, center.Y + b.Position.Y * _radius);
+            var sa = new PointF(center.X + a.Position.X * radius, center.Y + a.Position.Y * radius);
+            var sb = new PointF(center.X + b.Position.X * radius, center.Y + b.Position.Y * radius);
             using var p = new Pen(Color.DarkGray, 1);
             g.DrawLine(p, sa, sb);
         }
@@ -235,7 +262,7 @@ public partial class Form1 : Form
         foreach (var px in container.Pixels)
         {
             var color = PixelProcessingService.GetColorFromPixel(px, container);
-            var screen = new PointF(center.X + px.X * _radius, center.Y + px.Y * _radius);
+            var screen = new PointF(center.X + px.X * radius, center.Y + px.Y * radius);
             using var brush = new SolidBrush(color);
             g.FillEllipse(brush, screen.X - 4, screen.Y - 4, 8, 8);
             using var p = new Pen(Color.Black, 1);
