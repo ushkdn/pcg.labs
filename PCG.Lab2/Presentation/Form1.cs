@@ -16,6 +16,11 @@ public partial class Form1 : Form
     private readonly Button btnContrast;
     private readonly Button btnLoad;
     private readonly Button btnSaveAscii;
+    private readonly Button btnTransformations;
+    private TransformationParameters currentTransform = new();
+    private ColorTransformationParameters currentColorTransform = new();
+    private GraphicContainer previewContainer = new();
+    private bool isPreviewActive = false;
     private readonly Button btnLoadAscii;
     private readonly Button btnShowAscii;
     private readonly AsciiContainerService asciiService;
@@ -51,6 +56,14 @@ public partial class Form1 : Form
         btnContrast.Click += BtnContrast_Click;
         var asciiRepository = new AsciiContainerRepository();
         asciiService = new AsciiContainerService(asciiRepository);
+        btnTransformations = new Button
+        {
+            Text = "Преобразования",
+            Location = new Point(620, 300),
+            Width = 140
+        };
+        Controls.Add(btnTransformations);
+        btnTransformations.Click += BtnTransformations_Click;
 
         // Добавляем кнопки для работы с ASCII
         btnSaveAscii = new Button
@@ -82,15 +95,16 @@ public partial class Form1 : Form
         btnLoadAscii.Click += BtnLoadAscii_Click;
         btnShowAscii.Click += BtnShowAscii_Click;
 
-        // Обновляем информацию
+        lblInfo = new Label
+        {
+            Text = "ЛКМ: добавить пиксель\nПКМ: удалить ближайший\n" +
+                  "Редактировать палитру — изменить вершины\n" +
+                  "ASCII: текстовое представление контейнера",
+            Location = new Point(620, 520),
+            Width = 160,
+            Height = 80
+        };
 
-
-
-        lblInfo = new Label { Text = "ЛКМ: добавить пиксель\nПКМ: удалить ближайший\nРедактировать палитру — изменить вершины", Location = new Point(620, 230), Width = 160, Height = 80 };
-        lblInfo.Text = "ЛКМ: добавить пиксель\nПКМ: удалить ближайший\n" +
-              "Редактировать палитру — изменить вершины\n" +
-              "ASCII: текстовое представление контейнера";
-        lblInfo.Height = 100;
         canvas = new Panel
         {
             Location = new Point(20, 20),
@@ -119,6 +133,465 @@ public partial class Form1 : Form
         btnLoad.Click += BtnLoad_Click;
 
         CreateDefaultPalette();
+    }
+
+    private void BtnTransformations_Click(object? sender, EventArgs e)
+    {
+        using var transformDialog = new Form
+        {
+            Text = "Управление преобразованиями",
+            Size = new Size(500, 600),
+            StartPosition = FormStartPosition.CenterParent
+        };
+
+        var tabControl = new TabControl
+        {
+            Dock = DockStyle.Fill
+        };
+
+        // Вкладка геометрических преобразований
+        var geometricTab = CreateGeometricTransformationTab();
+        tabControl.TabPages.Add(geometricTab);
+
+        // Вкладка цветовых преобразований
+        var colorTab = CreateColorTransformationTab();
+        tabControl.TabPages.Add(colorTab);
+
+        // Вкладка предпросмотра
+        var previewTab = CreatePreviewTab();
+        tabControl.TabPages.Add(previewTab);
+
+        // Кнопки применения и отмены
+        var buttonPanel = new FlowLayoutPanel
+        {
+            FlowDirection = FlowDirection.RightToLeft,
+            Dock = DockStyle.Bottom,
+            Height = 40
+        };
+
+        var btnApply = new Button { Text = "Применить", Width = 80 };
+        var btnCancel = new Button { Text = "Отмена", Width = 80 };
+
+        btnApply.Click += (s, e) =>
+        {
+            ApplyTransformationsToMainContainer();
+            transformDialog.DialogResult = DialogResult.OK;
+        };
+
+        btnCancel.Click += (s, e) =>
+        {
+            isPreviewActive = false;
+            canvas.Invalidate();
+            transformDialog.DialogResult = DialogResult.Cancel;
+        };
+
+        buttonPanel.Controls.AddRange(new Control[] { btnCancel, btnApply });
+
+        var mainPanel = new Panel { Dock = DockStyle.Fill };
+        mainPanel.Controls.Add(tabControl);
+        mainPanel.Controls.Add(buttonPanel);
+
+        transformDialog.Controls.Add(mainPanel);
+
+        // Инициализируем предпросмотр
+        UpdatePreviewContainer();
+
+        if (transformDialog.ShowDialog() == DialogResult.OK)
+        {
+            canvas.Invalidate();
+            MessageBox.Show("Преобразования применены к основному контейнеру!");
+        }
+        else
+        {
+            // Отменяем предпросмотр
+            isPreviewActive = false;
+            canvas.Invalidate();
+        }
+    }
+
+    private void ApplyTransformationsToMainContainer()
+    {
+        // Применяем геометрические преобразования
+        var transformedContainer = TransformationService.ApplyTransformations(container, currentTransform);
+
+        // Заменяем пиксели в основном контейнере
+        container.Pixels.Clear();
+        foreach (var pixel in transformedContainer.Pixels)
+            container.Pixels.Add(pixel);
+
+        // Применяем цветовые преобразования к палитре
+        ApplyColorTransformationsToPalette();
+
+        isPreviewActive = false;
+    }
+
+    private void ApplyColorTransformationsToPalette()
+    {
+        if (currentColorTransform.Brightness == 0 &&
+            currentColorTransform.Contrast == 1.0f &&
+            currentColorTransform.Saturation == 1.0f &&
+            currentColorTransform.Hue == 0f)
+        {
+            return; // Нет изменений
+        }
+
+        var newPalette = new List<ColorVertex>();
+        foreach (var vertex in container.Palette)
+        {
+            var transformedColor = TransformationService.ApplySingleColorTransformations(
+                vertex.Color, currentColorTransform);
+            newPalette.Add(new ColorVertex(transformedColor, vertex.Position));
+        }
+
+        container.Palette.Clear();
+        foreach (var vertex in newPalette)
+            container.Palette.Add(vertex);
+    }
+
+    private void UpdatePreviewContainer()
+    {
+        // Копируем основной контейнер в предпросмотр
+        previewContainer.Clear();
+
+        // Копируем палитру с цветовыми преобразованиями
+        foreach (var vertex in container.Palette)
+        {
+            var transformedColor = TransformationService.ApplySingleColorTransformations(
+                vertex.Color, currentColorTransform);
+            previewContainer.Palette.Add(new ColorVertex(transformedColor, vertex.Position));
+        }
+
+        // Копируем пиксели с геометрическими преобразованиями
+        var transformedPixels = TransformationService.ApplyTransformations(container, currentTransform);
+        foreach (var pixel in transformedPixels.Pixels)
+        {
+            previewContainer.Pixels.Add(pixel);
+        }
+
+        isPreviewActive = true;
+        canvas.Invalidate();
+    }
+
+    private TabPage CreateGeometricTransformationTab()
+    {
+        var tab = new TabPage("Геометрические");
+
+        var layout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 2,
+            RowCount = 8,
+            Padding = new Padding(10)
+        };
+
+        // Масштаб
+        layout.Controls.Add(new Label { Text = "Масштаб:", AutoSize = true });
+        var trackScale = new TrackBar
+        {
+            Minimum = 10,
+            Maximum = 200,
+            Value = (int)(currentTransform.Scale * 100),
+            TickFrequency = 10
+        };
+        var lblScale = new Label { Text = $"{currentTransform.Scale:F2}" };
+        trackScale.ValueChanged += (s, e) =>
+        {
+            currentTransform = currentTransform with { Scale = trackScale.Value / 100f };
+            lblScale.Text = $"{currentTransform.Scale:F2}";
+            UpdatePreviewContainer();
+        };
+        layout.Controls.Add(CreateControlWithLabel(trackScale, lblScale));
+
+        // Поворот
+        layout.Controls.Add(new Label { Text = "Поворот (°):", AutoSize = true });
+        var trackRotation = new TrackBar
+        {
+            Minimum = -180,
+            Maximum = 180,
+            Value = (int)currentTransform.Rotation,
+            TickFrequency = 45
+        };
+        var lblRotation = new Label { Text = $"{currentTransform.Rotation:F0}°" };
+        trackRotation.ValueChanged += (s, e) =>
+        {
+            currentTransform = currentTransform with { Rotation = trackRotation.Value };
+            lblRotation.Text = $"{currentTransform.Rotation:F0}°";
+            UpdatePreviewContainer();
+        };
+        layout.Controls.Add(CreateControlWithLabel(trackRotation, lblRotation));
+
+        // Сдвиг по X
+        layout.Controls.Add(new Label { Text = "Сдвиг X:", AutoSize = true });
+        var trackOffsetX = new TrackBar
+        {
+            Minimum = -100,
+            Maximum = 100,
+            Value = (int)(currentTransform.OffsetX * 50),
+            TickFrequency = 25
+        };
+        var lblOffsetX = new Label { Text = $"{currentTransform.OffsetX:F2}" };
+        trackOffsetX.ValueChanged += (s, e) =>
+        {
+            currentTransform = currentTransform with { OffsetX = trackOffsetX.Value / 50f };
+            lblOffsetX.Text = $"{currentTransform.OffsetX:F2}";
+            UpdatePreviewContainer();
+        };
+        layout.Controls.Add(CreateControlWithLabel(trackOffsetX, lblOffsetX));
+
+        // Сдвиг по Y
+        layout.Controls.Add(new Label { Text = "Сдвиг Y:", AutoSize = true });
+        var trackOffsetY = new TrackBar
+        {
+            Minimum = -100,
+            Maximum = 100,
+            Value = (int)(currentTransform.OffsetY * 50),
+            TickFrequency = 25
+        };
+        var lblOffsetY = new Label { Text = $"{currentTransform.OffsetY:F2}" };
+        trackOffsetY.ValueChanged += (s, e) =>
+        {
+            currentTransform = currentTransform with { OffsetY = trackOffsetY.Value / 50f };
+            lblOffsetY.Text = $"{currentTransform.OffsetY:F2}";
+            UpdatePreviewContainer();
+        };
+        layout.Controls.Add(CreateControlWithLabel(trackOffsetY, lblOffsetY));
+
+        // Отражение по X
+        layout.Controls.Add(new Label { Text = "Отражение X:", AutoSize = true });
+        var chkMirrorX = new CheckBox
+        {
+            Checked = currentTransform.MirrorX
+        };
+        chkMirrorX.CheckedChanged += (s, e) =>
+        {
+            currentTransform = currentTransform with { MirrorX = chkMirrorX.Checked };
+            UpdatePreviewContainer();
+        };
+        layout.Controls.Add(chkMirrorX);
+
+        // Отражение по Y
+        layout.Controls.Add(new Label { Text = "Отражение Y:", AutoSize = true });
+        var chkMirrorY = new CheckBox
+        {
+            Checked = currentTransform.MirrorY
+        };
+        chkMirrorY.CheckedChanged += (s, e) =>
+        {
+            currentTransform = currentTransform with { MirrorY = chkMirrorY.Checked };
+            UpdatePreviewContainer();
+        };
+        layout.Controls.Add(chkMirrorY);
+
+        // Кнопка сброса
+        var btnReset = new Button { Text = "Сброс геометрии", Dock = DockStyle.Bottom };
+        btnReset.Click += (s, e) =>
+        {
+            currentTransform = new TransformationParameters();
+            trackScale.Value = 100;
+            trackRotation.Value = 0;
+            trackOffsetX.Value = 0;
+            trackOffsetY.Value = 0;
+            chkMirrorX.Checked = false;
+            chkMirrorY.Checked = false;
+            UpdatePreviewContainer();
+        };
+
+        var mainPanel = new Panel { Dock = DockStyle.Fill };
+        mainPanel.Controls.Add(layout);
+        mainPanel.Controls.Add(btnReset);
+
+        tab.Controls.Add(mainPanel);
+        return tab;
+    }
+
+    private TabPage CreateColorTransformationTab()
+    {
+        var tab = new TabPage("Цветовые");
+
+        var layout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 2,
+            RowCount = 6,
+            Padding = new Padding(10)
+        };
+
+        // Яркость
+        layout.Controls.Add(new Label { Text = "Яркость:", AutoSize = true });
+        var trackBrightness = new TrackBar
+        {
+            Minimum = -100,
+            Maximum = 100,
+            Value = currentColorTransform.Brightness,
+            TickFrequency = 25
+        };
+        var lblBrightness = new Label { Text = $"{currentColorTransform.Brightness}" };
+        trackBrightness.ValueChanged += (s, e) =>
+        {
+            currentColorTransform = currentColorTransform with { Brightness = trackBrightness.Value };
+            lblBrightness.Text = $"{currentColorTransform.Brightness}";
+            UpdatePreviewContainer();
+        };
+        layout.Controls.Add(CreateControlWithLabel(trackBrightness, lblBrightness));
+
+        // Контрастность
+        layout.Controls.Add(new Label { Text = "Контрастность:", AutoSize = true });
+        var trackContrast = new TrackBar
+        {
+            Minimum = 0,
+            Maximum = 300,
+            Value = (int)(currentColorTransform.Contrast * 100),
+            TickFrequency = 25
+        };
+        var lblContrast = new Label { Text = $"{currentColorTransform.Contrast:F2}" };
+        trackContrast.ValueChanged += (s, e) =>
+        {
+            currentColorTransform = currentColorTransform with { Contrast = trackContrast.Value / 100f };
+            lblContrast.Text = $"{currentColorTransform.Contrast:F2}";
+            UpdatePreviewContainer();
+        };
+        layout.Controls.Add(CreateControlWithLabel(trackContrast, lblContrast));
+
+        // Насыщенность
+        layout.Controls.Add(new Label { Text = "Насыщенность:", AutoSize = true });
+        var trackSaturation = new TrackBar
+        {
+            Minimum = 0,
+            Maximum = 300,
+            Value = (int)(currentColorTransform.Saturation * 100),
+            TickFrequency = 25
+        };
+        var lblSaturation = new Label { Text = $"{currentColorTransform.Saturation:F2}" };
+        trackSaturation.ValueChanged += (s, e) =>
+        {
+            currentColorTransform = currentColorTransform with { Saturation = trackSaturation.Value / 100f };
+            lblSaturation.Text = $"{currentColorTransform.Saturation:F2}";
+            UpdatePreviewContainer();
+        };
+        layout.Controls.Add(CreateControlWithLabel(trackSaturation, lblSaturation));
+
+        // Оттенок
+        layout.Controls.Add(new Label { Text = "Оттенок:", AutoSize = true });
+        var trackHue = new TrackBar
+        {
+            Minimum = -100,
+            Maximum = 100,
+            Value = (int)currentColorTransform.Hue,
+            TickFrequency = 25
+        };
+        var lblHue = new Label { Text = $"{currentColorTransform.Hue:F0}" };
+        trackHue.ValueChanged += (s, e) =>
+        {
+            currentColorTransform = currentColorTransform with { Hue = trackHue.Value };
+            lblHue.Text = $"{currentColorTransform.Hue:F0}";
+            UpdatePreviewContainer();
+        };
+        layout.Controls.Add(CreateControlWithLabel(trackHue, lblHue));
+
+        // Кнопка сброса
+        var btnReset = new Button { Text = "Сброс цветов", Dock = DockStyle.Bottom };
+        btnReset.Click += (s, e) =>
+        {
+            currentColorTransform = new ColorTransformationParameters();
+            trackBrightness.Value = 0;
+            trackContrast.Value = 100;
+            trackSaturation.Value = 100;
+            trackHue.Value = 0;
+            UpdatePreviewContainer();
+        };
+
+        var mainPanel = new Panel { Dock = DockStyle.Fill };
+        mainPanel.Controls.Add(layout);
+        mainPanel.Controls.Add(btnReset);
+
+        tab.Controls.Add(mainPanel);
+        return tab;
+    }
+
+    private TabPage CreatePreviewTab()
+    {
+        var tab = new TabPage("Предпросмотр");
+
+        var previewPanel = new Panel
+        {
+            Dock = DockStyle.Fill,
+            BorderStyle = BorderStyle.FixedSingle,
+            BackColor = Color.White
+        };
+
+        previewPanel.Paint += (s, e) => DrawPreviewPanel(e.Graphics, previewPanel.Size);
+
+        tab.Controls.Add(previewPanel);
+        return tab;
+    }
+
+    private void DrawPreviewPanel(Graphics g, Size size)
+    {
+        g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+        var center = new PointF(size.Width / 2f, size.Height / 2f);
+        float previewRadius = Math.Min(size.Width, size.Height) * 0.4f;
+
+        g.Clear(Color.White);
+
+        // Используем контейнер предпросмотра
+        var displayContainer = previewContainer;
+
+        // draw hex outline
+        var hexPts = new PointF[6];
+        for (int i = 0; i < 6; i++)
+        {
+            double angle = Math.PI / 3.0 * i;
+            float px = center.X + (float)Math.Cos(angle) * previewRadius;
+            float py = center.Y + (float)Math.Sin(angle) * previewRadius;
+            hexPts[i] = new PointF(px, py);
+        }
+        using var pen = new Pen(Color.Gray, 2);
+        g.DrawPolygon(pen, hexPts);
+
+        // draw vertices
+        foreach (var v in displayContainer.Palette)
+        {
+            var screenPos = new PointF(center.X + v.Position.X * previewRadius, center.Y + v.Position.Y * previewRadius);
+            using var brush = new SolidBrush(v.Color);
+            g.FillEllipse(brush, screenPos.X - 8, screenPos.Y - 8, 16, 16);
+            using var p = new Pen(Color.Black, 1);
+            g.DrawEllipse(p, screenPos.X - 8, screenPos.Y - 8, 16, 16);
+        }
+
+        // draw connecting lines
+        for (int i = 0; i < displayContainer.Palette.Count; i++)
+        {
+            var a = displayContainer.Palette[i];
+            var b = displayContainer.Palette[(i + 1) % displayContainer.Palette.Count];
+            var sa = new PointF(center.X + a.Position.X * previewRadius, center.Y + a.Position.Y * previewRadius);
+            var sb = new PointF(center.X + b.Position.X * previewRadius, center.Y + b.Position.Y * previewRadius);
+            using var p = new Pen(Color.DarkGray, 1);
+            g.DrawLine(p, sa, sb);
+        }
+
+        // draw pixels using application logic
+        foreach (var px in displayContainer.Pixels)
+        {
+            var color = PixelProcessingService.GetColorFromPixel(px, displayContainer);
+            var screen = new PointF(center.X + px.X * previewRadius, center.Y + px.Y * previewRadius);
+            using var brush = new SolidBrush(color);
+            g.FillEllipse(brush, screen.X - 3, screen.Y - 3, 6, 6);
+        }
+
+        // center (black)
+        g.FillEllipse(Brushes.Black, center.X - 4, center.Y - 4, 8, 8);
+    }
+
+    private Control CreateControlWithLabel(Control control, Label label)
+    {
+        var panel = new FlowLayoutPanel
+        {
+            FlowDirection = FlowDirection.LeftToRight,
+            AutoSize = true
+        };
+        panel.Controls.Add(control);
+        panel.Controls.Add(label);
+        return panel;
     }
 
     private void BtnSaveAscii_Click(object? sender, EventArgs e)
@@ -234,6 +707,7 @@ public partial class Form1 : Form
             MessageBox.Show($"Ошибка отображения ASCII: {ex.Message}");
         }
     }
+
     private void BtnGeneratePattern_Click(object? sender, EventArgs e)
     {
         using var patternDialog = new Form
@@ -383,6 +857,7 @@ public partial class Form1 : Form
                            $"Элементов: {container.Pixels.Count}");
         }
     }
+
     private void BtnLoad_Click(object? sender, EventArgs e)
     {
         using var ofd = new OpenFileDialog { Filter = "Hex container (*.hexc)|*.hexc|All files|*.*" };
@@ -427,7 +902,6 @@ public partial class Form1 : Form
 
         MessageBox.Show($"Контрастность изменена (x{factor:F1})");
     }
-
 
     private void BtnSave_Click(object? sender, EventArgs e)
     {
@@ -544,6 +1018,9 @@ public partial class Form1 : Form
 
         g.Clear(canvas.BackColor);
 
+        // Используем предпросмотр или основной контейнер
+        var displayContainer = isPreviewActive ? previewContainer : container;
+
         // draw hex outline
         var hexPts = new PointF[6];
         for (int i = 0; i < 6; i++)
@@ -557,7 +1034,7 @@ public partial class Form1 : Form
         g.DrawPolygon(pen, hexPts);
 
         // draw vertices
-        foreach (var v in container.Palette)
+        foreach (var v in displayContainer.Palette)
         {
             var screenPos = new PointF(center.X + v.Position.X * radius, center.Y + v.Position.Y * radius);
             using var brush = new SolidBrush(v.Color);
@@ -567,10 +1044,10 @@ public partial class Form1 : Form
         }
 
         // draw connecting lines
-        for (int i = 0; i < container.Palette.Count; i++)
+        for (int i = 0; i < displayContainer.Palette.Count; i++)
         {
-            var a = container.Palette[i];
-            var b = container.Palette[(i + 1) % container.Palette.Count];
+            var a = displayContainer.Palette[i];
+            var b = displayContainer.Palette[(i + 1) % displayContainer.Palette.Count];
             var sa = new PointF(center.X + a.Position.X * radius, center.Y + a.Position.Y * radius);
             var sb = new PointF(center.X + b.Position.X * radius, center.Y + b.Position.Y * radius);
             using var p = new Pen(Color.DarkGray, 1);
@@ -578,9 +1055,9 @@ public partial class Form1 : Form
         }
 
         // draw pixels using application logic
-        foreach (var px in container.Pixels)
+        foreach (var px in displayContainer.Pixels)
         {
-            var color = PixelProcessingService.GetColorFromPixel(px, container);
+            var color = PixelProcessingService.GetColorFromPixel(px, displayContainer);
             var screen = new PointF(center.X + px.X * radius, center.Y + px.Y * radius);
             using var brush = new SolidBrush(color);
             g.FillEllipse(brush, screen.X - 4, screen.Y - 4, 8, 8);
@@ -590,5 +1067,13 @@ public partial class Form1 : Form
 
         // center (black)
         g.FillEllipse(Brushes.Black, center.X - 6, center.Y - 6, 12, 12);
+
+        // Показываем подпись если активен предпросмотр
+        if (isPreviewActive)
+        {
+            using var previewFont = new Font("Arial", 10, FontStyle.Bold);
+            using var previewBrush = new SolidBrush(Color.Red);
+            g.DrawString("ПРЕДПРОСМОТР", previewFont, previewBrush, 10, 10);
+        }
     }
 }
